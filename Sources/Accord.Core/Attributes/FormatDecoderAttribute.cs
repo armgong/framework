@@ -26,6 +26,8 @@ namespace Accord
     using System.Collections.Generic;
     using System.ComponentModel.DataAnnotations;
     using System.Linq;
+    using System.Reflection;
+    using Accord.Compat;
 
     /// <summary>
     ///   Specifies that a class can be used to decode a particular file type.
@@ -64,24 +66,77 @@ namespace Accord
         {
             lock (dictionary)
             {
+                extension = extension.ToUpperInvariant();
                 if (dictionary.ContainsKey(extension))
                     return;
 
-                var decoderTypes = from a in AppDomain.CurrentDomain.GetAssemblies()
-                                   from r in a.GetReferencedAssemblies()
-                                   from t in AppDomain.CurrentDomain.Load(r).GetTypes()
-                                   let attributes = t.GetCustomAttributes(typeof(FormatDecoderAttribute), true)
-                                   where typeof(T).IsAssignableFrom(t)
-                                   where attributes != null && attributes.Length > 0
-                                   select new { Type = t, Attributes = attributes.Cast<FormatDecoderAttribute>() };
+                var decoderTypes = new List<Tuple<Type, FormatDecoderAttribute[]>>();
 
-                foreach (var t in decoderTypes)
+#if NETSTANDARD1_4
+                TypeInfo baseType = typeof(T).GetTypeInfo();
+
+                foreach (Type t in baseType.Assembly.ExportedTypes)
                 {
-                    foreach (FormatDecoderAttribute attr in t.Attributes)
+                    TypeInfo ti = t.GetTypeInfo();
+                    var attributes = ti.GetCustomAttributes(typeof(FormatDecoderAttribute), true).ToArray();
+
+                    if (attributes != null && attributes.Length > 0 && baseType.IsAssignableFrom(ti))
+                    {
+                        FormatDecoderAttribute[] at = attributes.Cast<FormatDecoderAttribute>().ToArray();
+                        decoderTypes.Add(Tuple.Create(t, at));
+                    }
+                }
+#else
+                Type baseType = typeof(T);
+
+                if (SystemTools.IsRunningOnMono())
+                {
+                    Console.WriteLine("FormatDecoderAttribute: Running on Mono ({0})", typeof(T));
+                    foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        foreach (Type t in a.GetTypes())
+                        {
+                            var attributes = t.GetCustomAttributes(typeof(FormatDecoderAttribute), true);
+
+                            if (attributes != null && attributes.Length > 0 && baseType.IsAssignableFrom(t))
+                            {
+                                FormatDecoderAttribute[] at = attributes.Cast<FormatDecoderAttribute>().ToArray();
+                                decoderTypes.Add(Tuple.Create(t, at));
+                            }
+                        }
+                    }
+                    Console.WriteLine("FormatDecoderAttribute: Found {0} {1} decoders.", decoderTypes.Count, typeof(T));
+                }
+                else
+                {
+                    foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        foreach (AssemblyName referencedName in a.GetReferencedAssemblies())
+                        {
+                            Assembly referencedAssembly = Assembly.Load(referencedName);
+
+                            foreach (Type t in referencedAssembly.GetTypes())
+                            {
+                                var attributes = t.GetCustomAttributes(typeof(FormatDecoderAttribute), true);
+
+                                if (attributes != null && attributes.Length > 0 && baseType.IsAssignableFrom(t))
+                                {
+                                    FormatDecoderAttribute[] at = attributes.Cast<FormatDecoderAttribute>().ToArray();
+                                    decoderTypes.Add(Tuple.Create(t, at));
+                                }
+                            }
+                        }
+                    }
+                }
+#endif
+
+                foreach (Tuple<Type, FormatDecoderAttribute[]> pair in decoderTypes)
+                {
+                    foreach (FormatDecoderAttribute attr in pair.Item2)
                     {
                         extension = attr.Extension.ToUpperInvariant();
                         if (!dictionary.ContainsKey(extension))
-                            dictionary.Add(extension, t.Type);
+                            dictionary.Add(extension, pair.Item1);
                     }
                 }
             }

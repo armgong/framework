@@ -38,6 +38,9 @@ namespace Accord
     using System.Data;
     using Accord.Collections;
     using System.Runtime.CompilerServices;
+    using System.Net;
+    using System.Threading;
+    using System.Threading.Tasks;
 
     /// <summary>
     ///   Static class for utility extension methods.
@@ -287,31 +290,54 @@ namespace Accord
             // http://stackoverflow.com/a/17457085/262032
 
 #if NETSTANDARD1_4 || NETSTANDARD2_0
-            var type = reader.GetType().GetTypeInfo();
+            var type = typeof(StreamReader).GetTypeInfo();
             char[] charBuffer = (char[])type.GetDeclaredField("_charBuffer").GetValue(reader);
             int charPos = (int)type.GetDeclaredField("_charPos").GetValue(reader);
             int byteLen = (int)type.GetDeclaredField("_byteLen").GetValue(reader);
 #else
-            // The current buffer of decoded characters
-            char[] charBuffer = (char[])reader.GetType().InvokeMember("charBuffer",
-                BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Instance
-                | BindingFlags.GetField, null, reader, null, CultureInfo.InvariantCulture);
+            var type = typeof(StreamReader);
 
-            // The current position in the buffer of decoded characters
-            int charPos = (int)reader.GetType().InvokeMember("charPos",
-                BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Instance
-                | BindingFlags.GetField, null, reader, null, CultureInfo.InvariantCulture);
+            char[] charBuffer;
+            int charPos;
+            int byteLen;
 
-            // The number of encoded bytes that are in the current buffer
-            int byteLen = (int)reader.GetType().InvokeMember("byteLen",
-                BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Instance
-                | BindingFlags.GetField, null, reader, null, CultureInfo.InvariantCulture);
+            if (SystemTools.IsRunningOnMono() && type.GetField("decoded_buffer") != null)
+            {
+                // Mono's StreamReader source code is at: https://searchcode.com/codesearch/view/26576619/
+
+                // The current buffer of decoded characters
+                charBuffer = (char[])GetField(reader, "decoded_buffer");
+
+                // The current position in the buffer of decoded characters
+                charPos = (int)GetField(reader, "decoded_count");
+
+                // The number of encoded bytes that are in the current buffer
+                byteLen = (int)GetField(reader, "buffer_size");
+            }
+            else
+            {
+                // The current buffer of decoded characters
+                charBuffer = (char[])GetField(reader, "charBuffer");
+
+                // The current position in the buffer of decoded characters
+                charPos = (int)GetField(reader, "charPos");
+
+                // The number of encoded bytes that are in the current buffer
+                byteLen = (int)GetField(reader, "byteLen");
+            }
 #endif
 
             // The number of bytes that the already-read characters need when encoded.
             int numReadBytes = reader.CurrentEncoding.GetByteCount(charBuffer, 0, charPos);
 
             return reader.BaseStream.Position - byteLen + numReadBytes;
+        }
+
+        private static object GetField(StreamReader reader, string name)
+        {
+            return typeof(StreamReader).InvokeMember(name,
+                BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Instance |
+                BindingFlags.GetField, null, reader, null, CultureInfo.InvariantCulture);
         }
 
 
@@ -372,13 +398,9 @@ namespace Accord
             Type inputType = value.GetType();
 
             var methods = new List<MethodInfo>();
-#if !NETSTANDARD1_4
             methods.AddRange(inputType.GetMethods(BindingFlags.Public | BindingFlags.Static));
             methods.AddRange(type.GetMethods(BindingFlags.Public | BindingFlags.Static));
-#else
-            methods.AddRange(inputType.GetTypeInfo().DeclaredMethods.ToArray());
-            methods.AddRange(type.GetTypeInfo().DeclaredMethods.ToArray());
-#endif
+
             foreach (MethodInfo m in methods)
             {
                 if (m.IsPublic && m.IsStatic)
@@ -572,6 +594,7 @@ namespace Accord
         }
 #endif
 
+#if !NETSTANDARD1_4
         /// <summary>
         ///   Retrieves the memory address of a generic value type.
         /// </summary>
@@ -608,6 +631,45 @@ namespace Accord
                 System.TypedReference reference = __makeref(t);
                 System.TypedReference* pRef = &reference;
                 return (System.IntPtr)pRef; //(&pRef)
+            }
+        }
+#endif
+
+        /// <summary>
+        ///   Attempts to download a file from the web multiple times before giving up.
+        /// </summary>
+        /// 
+        /// <param name="client">The web client to use.</param>
+        /// <param name="url">The URL of the file to be downloaded.</param>
+        /// <param name="fileName">The disk location where the file should be stored.</param>
+        /// <param name="maxAttempts">The maximum number of attempts.</param>
+        /// <param name="overwrite">Do not overwrite <paramref name="fileName"/> if it already exists.</param>
+        /// 
+        internal static void DownloadFileWithRetry(this WebClient client, string url, string fileName, int maxAttempts = 3, bool overwrite = false)
+        {
+            if (!overwrite && File.Exists(fileName))
+                return;
+
+            for (int numberOfAttempts = 0; numberOfAttempts <= maxAttempts; numberOfAttempts++)
+            {
+                Console.WriteLine("Downloading {0} (#{1})", url, numberOfAttempts);
+                try
+                {
+                    numberOfAttempts++;
+                    client.DownloadFile(url, fileName);
+                    break;
+                }
+                catch (WebException)
+                {
+                    int milliseconds = numberOfAttempts * 2000;
+#if NETSTANDARD1_4
+                    Task.Delay(milliseconds).Wait();
+#else
+                    Thread.Sleep(milliseconds);
+#endif
+                    if (numberOfAttempts == maxAttempts)
+                        throw;
+                }
             }
         }
     }
