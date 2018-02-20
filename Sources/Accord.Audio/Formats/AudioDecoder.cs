@@ -27,14 +27,16 @@ namespace Accord.Audio.Formats
     using System.IO;
     using System.Linq;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
+    using Accord.Compat;
 
     /// <summary>
     /// Audio decoder to decode different custom audio file formats.
     /// </summary>
     /// 
     /// <remarks><para>The class represent a help class, which simplifies decoding of audio
-    /// files finding appropriate image decoder automatically (using list of registered
+    /// files finding appropriate audio decoder automatically (using list of registered
     /// audio decoders). Instead of using required audio decoder directly, users may use this
     /// class, which will find required decoder by file's extension.</para>
     /// 
@@ -51,7 +53,9 @@ namespace Accord.Audio.Formats
     /// 
     public class AudioDecoder
     {
-        private static Dictionary<string, Type> decoders = new Dictionary<string, Type>();
+        private static Dictionary<string, Type> decoderTypes = new Dictionary<string, Type>();
+        private static ThreadLocal<Dictionary<string, IAudioDecoder>> decoders = 
+            new ThreadLocal<Dictionary<string, IAudioDecoder>>(() => new Dictionary<string, IAudioDecoder>());
 
         /// <summary>
         /// Decode a signal from the specified file.
@@ -78,41 +82,32 @@ namespace Accord.Audio.Formats
         /// 
         public static Signal DecodeFromFile(string fileName, out FrameInfo frameInfo)
         {
-            Signal signal = null;
+            string fileExtension = FormatDecoderAttribute.GetNormalizedExtension(fileName);
 
-            string fileExtension = Path.GetExtension(fileName).ToUpperInvariant();
+            IAudioDecoder decoder = FormatDecoderAttribute.GetDecoders(fileExtension, decoderTypes, decoders.Value);
 
-            if ((fileExtension != string.Empty) && (fileExtension.Length != 0))
+            if (decoder != null)
             {
-                fileExtension = fileExtension.Substring(1);
-
-                if (!decoders.ContainsKey(fileExtension))
-                    FormatDecoderAttribute.PopulateDictionaryWithDecodersFromAllAssemblies<IAudioDecoder>(decoders, fileExtension);
-
-                if (decoders.ContainsKey(fileExtension))
+                // open stream
+                using (FileStream stream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
                 {
-                    IAudioDecoder decoder = (IAudioDecoder)Activator.CreateInstance(decoders[fileExtension]);
+                    // open decoder
+                    decoder.Open(stream);
 
-                    // open stream
-                    using (FileStream stream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
-                    {
-                        // open decoder
-                        decoder.Open(stream);
+                    // read all audio frames
+                    Signal signal = decoder.Decode();
 
-                        // read all audio frames
-                        signal = decoder.Decode();
+                    decoder.Close();
 
-                        decoder.Close();
-                    }
-
-                    frameInfo = new FrameInfo(signal.Channels, signal.SampleRate, Signal.GetSampleSize(signal.SampleFormat), 0, signal.Length);
+                    frameInfo = new FrameInfo(signal.NumberOfChannels, signal.SampleRate, Signal.GetSampleSize(signal.SampleFormat), 0, signal.Length);
 
                     return signal;
                 }
             }
 
             throw new ArgumentException(String.Format("No suitable decoder has been found for the file format {0}. If ", fileExtension) +
-                "you are trying to decode .wav files, please add a reference to Accord.Audio.DirectSouond.", "fileName");
+                "you are trying to decode .wav files, please add a reference to Accord.Audio.DirectSound. You might need to instantiate" +
+                "at least one type from this assembly to make sure it has been loaded in the AppDomain of your applicatoin.", "fileName");
         }
 
     }

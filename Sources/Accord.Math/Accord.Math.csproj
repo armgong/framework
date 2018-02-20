@@ -5,7 +5,7 @@
     <RootNamespace>Accord.Math</RootNamespace>
     <AssemblyName>Accord.Math</AssemblyName>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)Accord.NET.targets" />
+  <Import Project="..\Accord.NET.targets" />
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugType>Full</DebugType>
     <Optimize>False</Optimize>
@@ -137,6 +137,7 @@
     <Compile Include="IO\NumPy\NpzFormat.Writer.cs" />
     <Compile Include="IO\NumPy\NpyFormat.Writer.cs" />
     <Compile Include="IO\NumPy\NpyFormat.Reader.cs" />
+    <Compile Include="Matrix\Jagged.Conversions.cs" />
     <Compile Include="Matrix\Jagged.Product.Generated.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -147,6 +148,8 @@
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
     </Compile>
+    <Compile Include="Matrix\Matrix.Enumerable.cs" />
+    <Compile Include="Matrix\Matrix.Tensor.cs" />
     <Compile Include="Matrix\Matrix.Product.Generated.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -244,6 +247,7 @@
     <Compile Include="Random\ZigguratUniformOneGenerator.cs" />
     <Compile Include="Random\ZigguratNormalGenerator.cs" />
     <Compile Include="Sort.cs" />
+    <Compile Include="Transforms\HilbertTransform2.cs" />
     <Compile Include="Vector\Vector.Random.cs" />
     <Compile Include="Vector\Vector.Parse.cs" />
     <Compile Include="Vector\Vector.Sparse.cs" />

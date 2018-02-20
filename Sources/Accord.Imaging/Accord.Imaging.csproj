@@ -5,7 +5,7 @@
     <RootNamespace>Accord.Imaging</RootNamespace>
     <AssemblyName>Accord.Imaging</AssemblyName>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)Accord.NET.targets" />
+  <Import Project="..\Accord.NET.targets" />
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugType>Full</DebugType>
     <Optimize>False</Optimize>
@@ -55,6 +55,7 @@
       <Link>Properties\VersionInfo.cs</Link>
     </Compile>
     <Compile Include="Accord.DataSets\TestImages.cs" />
+    <Compile Include="Filters\BinaryClosingShape.cs" />
     <Compile Include="Interest Points\Base\BaseCornersDetector.cs" />
     <Compile Include="AForge.Imaging\Filters\2 Source filters\Divide.cs" />
     <Compile Include="AForge.Imaging\Filters\2 Source filters\Multiply.cs" />
@@ -317,12 +318,12 @@
     <Compile Include="Interest Points\CornerFeaturesDetector.cs" />
     <Compile Include="Interest Points\Base\IImageFeatureExtractor.cs" />
     <Compile Include="Moments\HuMoments.cs" />
-    <Compile Include="Moments\MomentsBase.cs" />
+    <Compile Include="Moments\Base\MomentsBase.cs" />
     <Compile Include="Interest Points\Matching\CorrelationMatching.cs" />
     <Compile Include="Filters\CombineChannel.cs" />
     <Compile Include="Filters\Rectification.cs" />
     <Compile Include="Moments\CentralMoments.cs" />
-    <Compile Include="Moments\IMoments.cs" />
+    <Compile Include="Moments\Base\IMoments.cs" />
     <Compile Include="Moments\RawMoments.cs" />
     <Compile Include="Interest Points\FastCornersDetector.cs" />
     <Compile Include="Filters\FeaturesMarker.cs" />

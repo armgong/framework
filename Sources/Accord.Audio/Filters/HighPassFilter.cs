@@ -29,6 +29,10 @@ namespace Accord.Audio.Filters
     ///   High-pass band filter
     /// </summary>
     /// 
+    /// <example>
+    /// <code source="Unit Tests\Accord.Tests.Audio\Filters\HighPassFilterTest.cs" region="doc_example1" />
+    /// </example>
+    /// 
     public class HighPassFilter : BaseFilter
     {
 
@@ -89,7 +93,7 @@ namespace Accord.Audio.Filters
         protected override void ProcessFilter(Signal sourceData, Signal destinationData)
         {
             SampleFormat format = sourceData.SampleFormat;
-            int channels = sourceData.Channels;
+            int channels = sourceData.NumberOfChannels;
             int length = sourceData.Length;
 
             if (format == SampleFormat.Format32BitIeeeFloat)

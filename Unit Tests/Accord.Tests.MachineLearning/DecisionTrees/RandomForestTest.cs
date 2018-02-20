@@ -36,6 +36,7 @@ namespace Accord.Tests.MachineLearning
     using System.Globalization;
     using System.Linq;
     using Math.Optimization.Losses;
+    using System.IO;
 
     [TestFixture]
     public class RandomForestTest
@@ -94,6 +95,8 @@ namespace Accord.Tests.MachineLearning
             double error = new ZeroOneLoss(outputs).Loss(forest.Decide(inputs));
             #endregion
 
+            Assert.AreEqual(10, forest.Trees.Length);
+
             Assert.IsTrue(error < 0.015);
         }
 
@@ -101,6 +104,8 @@ namespace Accord.Tests.MachineLearning
         [Test]
         public void LargeRunTest()
         {
+            string localPath = Path.Combine(NUnit.Framework.TestContext.CurrentContext.TestDirectory, "rf");
+
             #region doc_nursery
             // Fix random seed for reproducibility
             Accord.Math.Random.Generator.Seed = 1;
@@ -128,7 +133,7 @@ namespace Accord.Tests.MachineLearning
             // Let's begin by loading the raw data. This string variable contains
             // the contents of the nursery.data file as a single, continuous text.
             //
-            var nursery = new DataSets.Nursery(@"C:\Temp\");
+            var nursery = new DataSets.Nursery(path: localPath);
             int[][] inputs = nursery.Instances;
             int[] outputs = nursery.ClassLabels;
 
@@ -168,9 +173,11 @@ namespace Accord.Tests.MachineLearning
         {
             // https://github.com/accord-net/framework/issues/576
 
+            string localPath = Path.Combine(NUnit.Framework.TestContext.CurrentContext.TestDirectory, "gh576");
+
             Accord.Math.Random.Generator.Seed = 1;
 
-            var nursery = new DataSets.Nursery(@"C:\Temp\");
+            var nursery = new DataSets.Nursery(localPath);
             int[][] inputs = nursery.Instances;
             int[] outputs = nursery.ClassLabels;
 
@@ -190,7 +197,30 @@ namespace Accord.Tests.MachineLearning
 
             double error = new ZeroOneLoss(outputs).Loss(forest.Decide(inputs));
 
-            Assert.AreEqual(0.0023148148148148147d, error, 1e-10);
+            Assert.AreEqual(1, forest.Trees.Length, 1e-10);
+            Assert.AreEqual(0.0220679012345679, error, 1e-10);
+
+
+
+
+            teacher = new RandomForestLearning(nursery.VariableNames)
+            {
+                NumberOfTrees = 100,
+                SampleRatio = 0.5
+            };
+
+            teacher.ParallelOptions.MaxDegreeOfParallelism = 1;
+
+            forest = teacher.Learn(inputs, outputs);
+
+            forest.ParallelOptions.MaxDegreeOfParallelism = 1;
+
+            predicted = forest.Decide(inputs);
+
+            error = new ZeroOneLoss(outputs).Loss(forest.Decide(inputs));
+
+            Assert.AreEqual(100, forest.Trees.Length, 1e-10);
+            Assert.AreEqual(0.00015432098765432099, error, 1e-10);
         }
 #endif
 
